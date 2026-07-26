@@ -1,4 +1,5 @@
 import { MODEL_CATALOGUE, SERIES_ORDER, BASS_SERIES } from '@/data/models'
+import { readPickupSvg, injectPickupColors } from '@/lib/pickup-svg'
 
 const MODEL_NICKNAMES: Record<string, string> = {
   'SF-1': 'Streetfighter',
@@ -60,7 +61,7 @@ export default async function ModelsPage() {
     supabase
       .from('ref_values')
       .select('id, category, display_name, descriptor, metadata')
-      .in('category', ['COL', 'CSC', 'HWC', 'PKC', 'CPKC'])
+      .in('category', ['COL', 'CSC', 'HWC', 'PKC', 'CPKC', 'BNC', 'FMC'])
       .eq('is_active', true)
       .order('sort_order'),
     supabase
@@ -81,10 +82,12 @@ export default async function ModelsPage() {
   }
 
   const colourRows = (rawColours ?? []) as ColourRow[]
-  const cscRows  = colourRows.filter(r => r.category === 'CSC' && r.id !== 'CSC-0004')
-  const hwcRows  = colourRows.filter(r => r.category === 'HWC' && r.id !== 'HWC-0004')
+  const cscRows  = colourRows.filter(r => r.category === 'CSC'  && r.id !== 'CSC-0004')
+  const hwcRows  = colourRows.filter(r => r.category === 'HWC'  && r.id !== 'HWC-0004')
   const pkcRows  = colourRows.filter(r => r.category === 'PKC'  && r.id !== 'PKC-0005')
   const cpkcRows = colourRows.filter(r => r.category === 'CPKC' && r.id !== 'CPKC-0005')
+  const bncRows  = colourRows.filter(r => r.category === 'BNC'  && r.id !== 'BNC-0004')
+  const fmcRows  = colourRows.filter(r => r.category === 'FMC'  && r.id !== 'FMC-0005')
 
   // Group factory body colours by model year from model_source_colours — dynamic, no hardcoded years
   type SourceColourEntry = { available_colours: string[]; source_materials: { year: string | null } | null }
@@ -138,55 +141,19 @@ export default async function ModelsPage() {
       : { code: '', name: displayName }
   }
 
-  function HumbuckerIcon({ row }: { row: ColourRow }) {
+  function pickupSwatchHtml(row: ColourRow): string {
     const style = row.metadata?.style ?? 'covered'
     const primary = row.metadata?.hex_primary ?? '#1e1c1a'
-    const secondary = row.metadata?.hex_secondary ?? primary
-    const line = 'rgba(255,255,255,0.45)'
-    const pole = 'rgba(0,0,0,0.55)'
-    const sw = '13.75'
-    const cys = [300, 505.5, 710.5, 917, 1123, 1329]
-    const screwYs = [257.5, 462.5, 668.5, 874.5, 1080.5, 1286.5]
-    if (style === 'open_coil') {
-      return (
-        <svg viewBox="3319 111 766 1407" width="38" height="70" style={{ display: 'block' }}>
-          <rect x="3326" y="118" width="365" height="1393" rx="182" fill={primary} />
-          <rect x="3713" y="118" width="365" height="1393" rx="182" fill={secondary} />
-          {cys.map(cy => <circle key={`l${cy}`} cx="3508.5" cy={cy} r="60.5" fill={pole} />)}
-          {cys.map(cy => <circle key={`r${cy}`} cx="3895.5" cy={cy} r="60.5" fill={pole} />)}
-          <path d="M3326 243.335C3326 174.114 3382.11 118 3451.34 118L3952.67 118C4021.89 118 4078 174.114 4078 243.335L4078 1385.67C4078 1454.89 4021.89 1511 3952.67 1511L3451.34 1511C3382.11 1511 3326 1454.89 3326 1385.67Z" stroke={line} strokeWidth={sw} strokeMiterlimit="8" fill="none" />
-          <g stroke={line} strokeWidth={sw} fill="none" strokeLinecap="round" strokeLinejoin="round" strokeMiterlimit="10">
-            <path d="M3508.5 118C3609.29 118 3691 199.484 3691 300"/>
-            <path d="M3326 300C3326 199.484 3407.71 118 3508.5 118"/>
-            <path d="M3508.5 1511C3407.71 1511 3326 1429.52 3326 1329"/>
-            <path d="M3691 1329C3691 1429.52 3609.29 1511 3508.5 1511"/>
-            <path d="M3326 300 3326 1329.12"/><path d="M3691 300 3691 1329.12"/>
-            {cys.map(cy => <circle key={cy} cx="3508.5" cy={cy} r="60.5"/>)}
-          </g>
-          <g stroke={line} strokeWidth={sw} fill="none" strokeLinecap="round" strokeLinejoin="round" strokeMiterlimit="10">
-            <path d="M3895.5 118C3996.29 118 4078 199.484 4078 300"/>
-            <path d="M3713 300C3713 199.484 3794.71 118 3895.5 118"/>
-            <path d="M3895.5 1511C3794.71 1511 3713 1429.52 3713 1329"/>
-            <path d="M4078 1329C4078 1429.52 3996.29 1511 3895.5 1511"/>
-            <path d="M3713 300 3713 1329.12"/><path d="M4078 300 4078 1329.12"/>
-            {cys.map(cy => <circle key={cy} cx="3895.5" cy={cy} r="60.5"/>)}
-          </g>
-          {screwYs.map(y => <path key={y} d="M0 0 85.8837 85.8837" stroke={line} strokeWidth="22.9167" strokeMiterlimit="8" fill="none" transform={`matrix(-1 0 0 1 3551.38 ${y})`}/>)}
-        </svg>
-      )
+    const secondary = row.metadata?.hex_secondary ?? undefined
+    const filename =
+      style === 'active'    ? 'pkp-0005-active' :
+      style === 'open_coil' ? 'pkp-0001-a-type-open-bridge' :
+                              'pkp-0001-a-type-nickel-bridge'
+    try {
+      return injectPickupColors(readPickupSvg(filename), primary, secondary, style)
+    } catch {
+      return ''
     }
-    return (
-      <svg viewBox="2362 111 766 1407" width="38" height="70" style={{ display: 'block' }}>
-        <rect x="2369" y="118" width="752" height="1393" rx="125" fill={primary} />
-        {cys.map(cy => <circle key={cy} cx="2551.5" cy={cy} r="60.5" fill={pole} />)}
-        <path d="M2369 243.335C2369 174.114 2425.11 118 2494.34 118L2995.67 118C3064.89 118 3121 174.114 3121 243.335L3121 1385.67C3121 1454.89 3064.89 1511 2995.67 1511L2494.34 1511C2425.11 1511 2369 1454.89 2369 1385.67Z" stroke={line} strokeWidth={sw} strokeMiterlimit="8" fill="none" />
-        <g stroke={line} strokeWidth={sw} fill="none" strokeLinecap="round" strokeLinejoin="round" strokeMiterlimit="10">
-          <path d="M2369 300 2369 1329.12"/><path d="M3121 300 3121 1329.12"/>
-          {cys.map(cy => <circle key={cy} cx="2551.5" cy={cy} r="60.5"/>)}
-        </g>
-        {screwYs.map(y => <path key={y} d="M0 0 85.8837 85.8837" stroke={line} strokeWidth="22.9167" strokeMiterlimit="8" fill="none" transform={`matrix(-1 0 0 1 2594.38 ${y})`}/>)}
-      </svg>
-    )
   }
 
   function SeriesSection({ series, bass = false }: { series: string; bass?: boolean }) {
@@ -387,9 +354,9 @@ export default async function ModelsPage() {
               color: '#f0ede8', marginBottom: '24px',
             }}>IDENTIFY YOUR GEN</h2>
             <p style={{ maxWidth: '600px', color: '#9e9b96', fontSize: '16px', lineHeight: 1.7 }}>
-              Maverick guitars were produced across multiple generations with identifiable spec changes between them.
-              Seven confirmed indicators have been established from catalogue evidence and documented examples — primarily the F1 and F1HT.
-              This guide sharpens as more examples are registered.
+              Maverick produced guitars across four identifiable production periods. Confirmed physical
+              indicators and catalogue evidence establish clear separators applicable across all models
+              in the range — not just the flagship F1.
             </p>
           </div>
         </div>
@@ -409,6 +376,37 @@ export default async function ModelsPage() {
           </p>
         </div>
 
+        {/* Generation timeline */}
+        <div style={{ padding: '3rem 4rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <p style={{
+            fontFamily: 'var(--font-dm-mono)', fontSize: '11px', letterSpacing: '3px',
+            color: '#5c5a57', textTransform: 'uppercase', marginBottom: '24px',
+          }}>Production timeline</p>
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1px',
+            background: 'rgba(255,255,255,0.06)',
+          }}>
+            {[
+              { gen: 'Gen 0.5', years: '2000 – 2001', colour: '#b8965a', desc: 'First production run. Foil decal headstock logo, Bubinga neck laminate, Maverick Stylised ® trademark on most models. Truss rod cover on F1, X1, B1 and SF-1.' },
+              { gen: 'Gen 1', years: '2001 – 2003', colour: '#c8a96e', desc: 'Main catalogue period. Ivory silkscreen headstock logo, silver serial, Maverick Stylised ® trademark. No pickup surrounds. Core production run.' },
+              { gen: 'Gen 2', years: '2004 – 2007', colour: '#9e9b96', desc: 'Final production period. Metal pickup surrounds, Industry Standard ® trademark, stencil bridge logo, C/D neck profile, O-ring removed from switch knob.' },
+              { gen: 'Pre-production', years: 'Pre 2000', colour: '#3a3835', desc: 'Prototype and pre-series models only. No headstock trademark. Mixed construction. Includes Species 3 and SF-3. Not commercially released.' },
+            ].map(item => (
+              <div key={item.gen} style={{ background: '#161616', padding: '1.75rem' }}>
+                <div style={{ fontFamily: 'var(--font-bebas)', fontSize: '26px', letterSpacing: '2px', color: item.colour, lineHeight: 1, marginBottom: '4px' }}>
+                  {item.gen}
+                </div>
+                <div style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '11px', color: item.colour, opacity: 0.7, marginBottom: '10px' }}>
+                  {item.years}
+                </div>
+                <p style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '11px', color: '#5c5a57', lineHeight: 1.65 }}>
+                  {item.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Quickest test */}
         <div style={{ padding: '4rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <p style={{
@@ -420,43 +418,49 @@ export default async function ModelsPage() {
             letterSpacing: '2px', color: '#f0ede8', marginBottom: '20px',
           }}>LOOK AT THE PICKUPS</h3>
           <p style={{ color: '#9e9b96', fontSize: '15px', lineHeight: 1.75, maxWidth: '680px', marginBottom: '32px' }}>
-            The single most reliable visual indicator is the pickup surrounds.
-            Does a plastic frame surround each pickup, or does it sit flush in a routed cavity with body finish visible around it?
+            The single most reliable visual separator between Gen 2 and all earlier production is the pickup surrounds.
+            Does a metal frame surround each pickup, or does it sit flush in a routed cavity with body finish visible around it?
           </p>
           <div style={{
             display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1px',
             background: 'rgba(255,255,255,0.06)', maxWidth: '680px',
           }}>
             <div style={{ background: '#161616', padding: '1.75rem' }}>
-              <div style={{ fontFamily: 'var(--font-bebas)', fontSize: '24px', letterSpacing: '2px', color: '#c8a96e', marginBottom: '10px' }}>
-                No surround → Gen 1
+              <div style={{ fontFamily: 'var(--font-bebas)', fontSize: '22px', letterSpacing: '2px', color: '#c8a96e', marginBottom: '10px' }}>
+                No surround → Gen 0.5 or Gen 1
               </div>
               <p style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '12px', color: '#9e9b96', lineHeight: 1.65 }}>
-                Pickup sits flush in the routed cavity. Confirmed spec shown throughout the 2001 and 2002 catalogues.
+                Pickup sits flush in the routed cavity. Present throughout both the 2001 and 2002 catalogues. Use the additional indicators below to separate Gen 0.5 from Gen 1.
               </p>
             </div>
             <div style={{ background: '#161616', padding: '1.75rem', borderLeft: '1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ fontFamily: 'var(--font-bebas)', fontSize: '24px', letterSpacing: '2px', color: '#9e9b96', marginBottom: '10px' }}>
+              <div style={{ fontFamily: 'var(--font-bebas)', fontSize: '22px', letterSpacing: '2px', color: '#9e9b96', marginBottom: '10px' }}>
                 Surround present → Gen 2
               </div>
               <p style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '12px', color: '#9e9b96', lineHeight: 1.65 }}>
-                A metal surround frames each pickup. Confirmed Gen 2 indicator across documented examples.
+                A metal frame surrounds each pickup housing. Confirmed Gen 2 indicator across all documented examples.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Comparison table */}
+        {/* 4-column comparison table */}
         <div style={{ padding: '4rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <h3 style={{
             fontFamily: 'var(--font-bebas)', fontSize: 'clamp(28px, 3vw, 44px)',
-            letterSpacing: '2px', color: '#f0ede8', marginBottom: '32px',
-          }}>GEN 1 vs GEN 2</h3>
+            letterSpacing: '2px', color: '#f0ede8', marginBottom: '8px',
+          }}>CONFIRMED INDICATORS</h3>
+          <p style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '13px', color: '#5c5a57', marginBottom: '32px', maxWidth: '640px', lineHeight: 1.6 }}>
+            Derived from gen spec data across all models. Evolution Roller Pots and Maverick-branded Gotoh-style tuners are consistent throughout all generations — they are production constants, not separators.
+          </p>
 
           {/* Column headers */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1px', background: 'rgba(255,255,255,0.06)', marginBottom: '1px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 1fr', gap: '1px', background: 'rgba(255,255,255,0.06)', marginBottom: '1px' }}>
             <div style={{ background: '#111', padding: '0.75rem 1.5rem' }}>
               <span style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '10px', letterSpacing: '2px', textTransform: 'uppercase', color: '#5c5a57' }}>Feature</span>
+            </div>
+            <div style={{ background: '#111', padding: '0.75rem 1.5rem', borderLeft: '1px solid rgba(255,255,255,0.06)' }}>
+              <span style={{ fontFamily: 'var(--font-bebas)', fontSize: '18px', letterSpacing: '2px', color: '#b8965a' }}>Gen 0.5</span>
             </div>
             <div style={{ background: '#111', padding: '0.75rem 1.5rem', borderLeft: '1px solid rgba(255,255,255,0.06)' }}>
               <span style={{ fontFamily: 'var(--font-bebas)', fontSize: '18px', letterSpacing: '2px', color: '#c8a96e' }}>Gen 1</span>
@@ -468,64 +472,79 @@ export default async function ModelsPage() {
 
           {[
             {
-              label: 'Pickup surrounds', confidence: 'Confirmed' as const,
-              gen1: 'None — pickups sit flush in routed cavities with no plastic frame',
-              gen2: 'Metal surrounds — a frame surrounds each pickup housing',
+              label: 'Pickup surrounds', note: null, confidence: 'Confirmed' as const,
+              gen05: 'None — flush-mounted in routed cavity',
+              gen1:  'None — flush-mounted in routed cavity',
+              gen2:  'Metal surrounds on all models',
             },
             {
-              label: 'Switch knob', confidence: 'Confirmed' as const,
-              gen1: 'Cylindrical barrel knob with O-ring detail',
-              gen2: 'Tapered knob — no O-ring',
+              label: 'Headstock trademark', note: 'Strongest Gen 1 → Gen 2 separator', confidence: 'Confirmed' as const,
+              gen05: 'Maverick Stylised ® on most models — absent on F2 and F3',
+              gen1:  'Maverick Stylised ® confirmed across all catalogued models',
+              gen2:  'Industry Standard ® — different symbol and placement',
             },
             {
-              label: 'Headstock logo', confidence: 'Confirmed' as const,
-              gen1: 'Maverick script — lacquer-encapsulated foil decal',
-              gen2: 'Maverick script — cream silkscreen print',
+              label: 'Headstock logo', note: null, confidence: 'Confirmed' as const,
+              gen05: 'Lacquer-encapsulated foil decal',
+              gen1:  'Ivory silkscreen print',
+              gen2:  'Ivory silkscreen print',
             },
             {
-              label: 'Bridge logo', confidence: 'Confirmed' as const,
-              gen1: 'Maverick classic script logo on bridge plate',
-              gen2: 'Maverick stencil script logo on bridge plate',
+              label: 'Serial number style', note: null, confidence: 'Confirmed' as const,
+              gen05: 'Label (F1) or plain silkscreen (F2, X1) — no silver finish',
+              gen1:  'Silver silkscreen',
+              gen2:  'Silver silkscreen',
             },
             {
-              label: 'Neck construction', confidence: 'Confirmed' as const,
-              gen1: 'Bolt-on 2-piece with scarf joint',
-              gen2: 'Bolt-on 1-piece',
+              label: 'Neck wood', note: null, confidence: 'Confirmed' as const,
+              gen05: 'Canadian Maple with Bubinga laminate — visible as dark stripe on neck back',
+              gen1:  'Canadian Maple — single species, no Bubinga stripe',
+              gen2:  'Canadian Maple — single species, no Bubinga stripe',
             },
             {
-              label: 'Neck binding', confidence: 'Confirmed' as const,
-              gen1: 'No binding',
-              gen2: 'Cream binding',
+              label: 'Switch knob', note: null, confidence: 'Confirmed' as const,
+              gen05: 'Cylindrical barrel with rubber O-rings',
+              gen1:  'Cylindrical barrel with rubber O-rings (cylindrical-knob models)',
+              gen2:  'Cylindrical barrel without O-rings, or tapered knob',
             },
             {
-              label: 'Skunk stripe', confidence: 'Confirmed' as const,
-              gen1: 'Bubinga skunk stripe on neck back',
-              gen2: 'No skunk stripe',
+              label: 'Bridge logo', note: null, confidence: 'Confirmed' as const,
+              gen05: 'Classic Script — flowing cursive on bridge plate',
+              gen1:  'Classic Script — flowing cursive on bridge plate',
+              gen2:  'Stencil Script — block-style logo on bridge plate',
             },
             {
-              label: 'Potentiometers', confidence: 'Tentative' as const,
-              gen1: 'Evolution roller pots — distinctive rolling barrel controls',
-              gen2: 'To be established — pending more documented Gen 2 examples',
+              label: 'Neck profile', note: null, confidence: 'Confirmed' as const,
+              gen05: 'Ultra Thin — Shallow C shape',
+              gen1:  'Ultra Thin — Shallow C shape',
+              gen2:  'C/D shape; Composite V→D on F4',
             },
             {
-              label: 'Serial number range', confidence: 'Unknown' as const,
-              gen1: 'Not yet established',
-              gen2: 'Not yet established',
+              label: 'Neck construction', note: 'Bolt-on models only — G-series is set-neck throughout', confidence: 'Tentative' as const,
+              gen05: '3-piece laminated scarf joint',
+              gen1:  '3-piece laminated scarf joint (bolt-on models)',
+              gen2:  '1-piece carved — no scarf joint confirmed on any bolt-on model',
             },
           ].map((row, i, arr) => {
-            const confColour = row.confidence === 'Confirmed' ? '#c8a96e' : row.confidence === 'Tentative' ? '#7a6a4f' : '#3a3835'
-            const confBg = row.confidence === 'Confirmed' ? 'rgba(200,169,110,0.08)' : row.confidence === 'Tentative' ? 'rgba(200,169,110,0.04)' : 'rgba(255,255,255,0.03)'
+            const confColour = row.confidence === 'Confirmed' ? '#c8a96e' : '#7a6a4f'
+            const confBg    = row.confidence === 'Confirmed' ? 'rgba(200,169,110,0.08)' : 'rgba(200,169,110,0.04)'
             return (
               <div key={row.label} style={{
-                display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1px',
+                display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 1fr', gap: '1px',
                 background: 'rgba(255,255,255,0.06)',
                 marginBottom: i < arr.length - 1 ? '1px' : '0',
               }}>
                 <div style={{ background: '#161616', padding: '1.25rem 1.5rem' }}>
                   <div style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '13px', color: '#f0ede8', marginBottom: '6px' }}>{row.label}</div>
+                  {row.note && (
+                    <div style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '10px', color: '#5c5a57', marginBottom: '6px', lineHeight: 1.4 }}>{row.note}</div>
+                  )}
                   <div style={{ display: 'inline-block', fontFamily: 'var(--font-dm-mono)', fontSize: '10px', letterSpacing: '1.5px', textTransform: 'uppercase', color: confColour, background: confBg, padding: '2px 7px' }}>
                     {row.confidence}
                   </div>
+                </div>
+                <div style={{ background: '#161616', padding: '1.25rem 1.5rem', borderLeft: '1px solid rgba(255,255,255,0.06)' }}>
+                  <p style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '12px', color: '#9e9b96', lineHeight: 1.55 }}>{row.gen05}</p>
                 </div>
                 <div style={{ background: '#161616', padding: '1.25rem 1.5rem', borderLeft: '1px solid rgba(255,255,255,0.06)' }}>
                   <p style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '12px', color: '#9e9b96', lineHeight: 1.55 }}>{row.gen1}</p>
@@ -550,20 +569,24 @@ export default async function ModelsPage() {
           }}>
             {[
               {
+                model: 'F1, X1, B1, SF-1', badge: 'Confirmed', badgeGold: true,
+                body: 'Gen 0.5 examples carry a Maverick truss rod cover — a plastic cover over the headstock truss rod access. Absent from Gen 1 onwards and absent from F2 and F3 in Gen 0.5. A useful secondary identifier for these four models in the earliest production run.',
+              },
+              {
                 model: 'F2', badge: 'Confirmed', badgeGold: true,
-                body: 'Gen 1 F2 examples carry a ~1° neck pitch requiring ~8mm body packing — PRS-equivalent geometry producing exceptionally low action. Confirmed available in Tobacco Burst and Fireburst per the 2002 catalogue.',
+                body: 'Gen 1 examples carry a ~1° neck pitch requiring ~8mm body packing — PRS-equivalent geometry producing exceptionally low action potential. No truss rod cover despite being a Gen 0.5 model. Confirmed available in Tobacco Burst and Fireburst per the 2002 catalogue.',
+              },
+              {
+                model: 'SF-1', badge: 'Confirmed', badgeGold: true,
+                body: 'Retailer-commissioned limited run with reverse headstock and Wilkinson hardware throughout — outside the normal production spec for any generation. As few as 4 known examples in certain colourways. Generation assignment should be treated with caution.',
               },
               {
                 model: 'X1', badge: 'Tentative', badgeGold: false,
                 body: 'Available in 6 and 7-string configurations. The 7-string variant is rarer and generation placement is unconfirmed. If you own an X1 7-string, register it.',
               },
-              {
-                model: 'SF-1', badge: 'Confirmed', badgeGold: true,
-                body: 'Retailer-commissioned limited run — does not follow the same production timeline as the main catalogue. As few as 4 known examples in certain colourways. Generation assignment should be treated with caution.',
-              },
             ].map(item => (
               <div key={item.model} style={{ background: '#161616', padding: '2rem' }}>
-                <div style={{ fontFamily: 'var(--font-bebas)', fontSize: '42px', color: '#c8a96e', letterSpacing: '3px', lineHeight: 1, marginBottom: '8px' }}>
+                <div style={{ fontFamily: 'var(--font-bebas)', fontSize: '36px', color: '#c8a96e', letterSpacing: '3px', lineHeight: 1, marginBottom: '8px' }}>
                   {item.model}
                 </div>
                 <div style={{
@@ -694,9 +717,9 @@ export default async function ModelsPage() {
                 const { code, name } = swatchLabel(row.display_name)
                 return (
                   <div key={row.id} style={{ background: '#161616' }}>
-                    <div style={{ height: '110px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <HumbuckerIcon row={row} />
-                    </div>
+                    <div style={{ height: '110px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      dangerouslySetInnerHTML={{ __html: pickupSwatchHtml(row) }}
+                    />
                     <div style={{ padding: '10px 14px' }}>
                       {code && <div style={{ fontFamily: 'var(--font-bebas)', fontSize: '20px', letterSpacing: '2px', color: '#c8a96e', lineHeight: 1, marginBottom: '3px' }}>{code}</div>}
                       <div style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '11px', color: '#9e9b96', lineHeight: 1.4 }}>{name}</div>
@@ -741,6 +764,78 @@ export default async function ModelsPage() {
                           {row.metadata.pattern}
                         </div>
                       )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Binding colours */}
+        {bncRows.length > 0 && (
+          <div style={{ padding: '3rem 4rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ marginBottom: '24px' }}>
+              <p style={{
+                fontFamily: 'var(--font-dm-mono)', fontSize: '11px', letterSpacing: '3px',
+                color: '#5c5a57', textTransform: 'uppercase', marginBottom: '8px',
+              }}>Binding · {bncRows.length} options</p>
+              <h3 style={{
+                fontFamily: 'var(--font-bebas)', fontSize: 'clamp(28px, 3vw, 44px)',
+                letterSpacing: '2px', color: '#c8a96e', lineHeight: 1,
+              }}>Binding Colours</h3>
+            </div>
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+              gap: '1px', background: 'rgba(255,255,255,0.06)',
+            }}>
+              {bncRows.map(row => {
+                const { code, name } = swatchLabel(row.display_name)
+                return (
+                  <div key={row.id} style={{ background: '#161616' }}>
+                    <div
+                      title={row.metadata?.hex_note ?? undefined}
+                      style={{ height: '100px', background: swatchBg(row) }}
+                    />
+                    <div style={{ padding: '12px 14px' }}>
+                      {code && <div style={{ fontFamily: 'var(--font-bebas)', fontSize: '20px', letterSpacing: '2px', color: '#c8a96e', lineHeight: 1, marginBottom: '3px' }}>{code}</div>}
+                      <div style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '11px', color: '#9e9b96', lineHeight: 1.4 }}>{name}</div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Fretboard marker colours */}
+        {fmcRows.length > 0 && (
+          <div style={{ padding: '3rem 4rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ marginBottom: '24px' }}>
+              <p style={{
+                fontFamily: 'var(--font-dm-mono)', fontSize: '11px', letterSpacing: '3px',
+                color: '#5c5a57', textTransform: 'uppercase', marginBottom: '8px',
+              }}>Fretboard Markers · {fmcRows.length} options</p>
+              <h3 style={{
+                fontFamily: 'var(--font-bebas)', fontSize: 'clamp(28px, 3vw, 44px)',
+                letterSpacing: '2px', color: '#c8a96e', lineHeight: 1,
+              }}>Fretboard Marker Colours</h3>
+            </div>
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+              gap: '1px', background: 'rgba(255,255,255,0.06)',
+            }}>
+              {fmcRows.map(row => {
+                const { code, name } = swatchLabel(row.display_name)
+                return (
+                  <div key={row.id} style={{ background: '#161616' }}>
+                    <div
+                      title={row.metadata?.hex_note ?? undefined}
+                      style={{ height: '100px', background: swatchBg(row) }}
+                    />
+                    <div style={{ padding: '12px 14px' }}>
+                      {code && <div style={{ fontFamily: 'var(--font-bebas)', fontSize: '20px', letterSpacing: '2px', color: '#c8a96e', lineHeight: 1, marginBottom: '3px' }}>{code}</div>}
+                      <div style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '11px', color: '#9e9b96', lineHeight: 1.4 }}>{name}</div>
                     </div>
                   </div>
                 )
@@ -816,9 +911,9 @@ export default async function ModelsPage() {
                 const { code, name } = swatchLabel(row.display_name)
                 return (
                   <div key={row.id} style={{ background: '#161616' }}>
-                    <div style={{ height: '110px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <HumbuckerIcon row={row} />
-                    </div>
+                    <div style={{ height: '110px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      dangerouslySetInnerHTML={{ __html: pickupSwatchHtml(row) }}
+                    />
                     <div style={{ padding: '10px 14px' }}>
                       {code && <div style={{ fontFamily: 'var(--font-bebas)', fontSize: '20px', letterSpacing: '2px', color: '#9e9b96', lineHeight: 1, marginBottom: '3px' }}>{code}</div>}
                       <div style={{ fontFamily: 'var(--font-dm-mono)', fontSize: '11px', color: '#9e9b96', lineHeight: 1.4 }}>{name}</div>
