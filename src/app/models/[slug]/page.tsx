@@ -194,11 +194,6 @@ function SpecBlock({ spec, refMap, versionedSpecs, productionYears, hidePickups 
       <SpecGroup label="Pickups & electronics" />
       <SpecRow label="Pickup configuration" value={r(refMap, spec.pickup_configuration)} />
       <SpecRow label="Coil tap"             value={r(refMap, spec.coil_tap)} />
-      <SpecRow label="Selector switch type" value={
-        versionedSpecs['switch_type']?.length > 0
-          ? versionedSpecs['switch_type'].map(v => `${r(refMap, v.value) ?? v.value}${versionedSpecs['switch_type'].length > 1 && v.year ? ` (${v.year})` : ''}`).join(' → ')
-          : r(refMap, spec.switch_type)
-      } />
       <SpecRow label="Volume pot"           value={r(refMap, spec.volume_pot)} />
       <SpecRow label="Volume pot count"     value={spec.volume_pot_count} />
       <SpecRow label="Tone pot"             value={r(refMap, spec.tone_pot)} />
@@ -334,7 +329,7 @@ export default async function ModelPage({ params }: { params: Promise<{ slug: st
     supabase.from('model_specifications').select('*').eq('parent_model_id', spec.id),
     supabase.from('model_gen_specs').select('*').eq('model_id', spec.id).order('generation'),
     supabase.from('guitars').select('serial_number_only').eq('model_id', spec.id).eq('status', 'Approved'),
-    supabase.from('ref_values').select('id, metadata').in('category', ['COL', 'CSC', 'HWC', 'PKC', 'CPKC']).eq('is_active', true),
+    supabase.from('ref_values').select('id, metadata').in('category', ['COL', 'CSC', 'HWC', 'PKC', 'CPKC', 'BNC', 'FMC']).eq('is_active', true),
     parentSpecPromise,
     supabase.from('model_source_colours').select('available_colours, available_custom_shop_colours, available_hardware_colours, available_pickup_colours, available_custom_shop_pickup_colours, notes, year_qualifier, source_materials(id, title, year, material_type)').eq('model_id', spec.id),
     supabase.from('model_spec_sources').select('field_name, field_value, source_materials(year, title)').eq('spec_id', spec.id).not('field_value', 'is', null),
@@ -401,6 +396,18 @@ export default async function ModelPage({ params }: { params: Promise<{ slug: st
   const customShopPickupColourIds = [...new Set(
     sourceColours.flatMap(sc => sc.available_custom_shop_pickup_colours ?? [])
   )]
+
+  // Aggregate unique binding and marker colours across all gen specs, including spec_options variants
+  const bindingColourIds = [...new Set([
+    ...genSpecs.map(gs => gs.binding_colour),
+    ...genSpecs.flatMap(gs => gs.spec_options?.binding_colour ?? []),
+  ].filter((id): id is string => id != null))]
+  const markerColourIds = [...new Set([
+    ...genSpecs.map(gs => gs.fretboard_marker_colour),
+    ...genSpecs.map(gs => gs.side_dot_colour),
+    ...genSpecs.flatMap(gs => gs.spec_options?.fretboard_marker_colour ?? []),
+    ...genSpecs.flatMap(gs => gs.spec_options?.side_dot_colour ?? []),
+  ].filter((id): id is string => id != null))]
 
   // Group factory body colours by source year — deduplicated across all sources for that year
   const factoryColoursByYear = new Map<string, string[]>()
@@ -644,6 +651,22 @@ export default async function ModelPage({ params }: { params: Promise<{ slug: st
               )}
             </div>
 
+            {/* Binding colour — aggregated unique values across gen specs */}
+            {bindingColourIds.length > 0 && (
+              <div>
+                {sectionHead('Binding Colours')}
+                <ColourSwatches colours={bindingColourIds} colourMetaMap={colourMetaMap} refMap={refMap} />
+              </div>
+            )}
+
+            {/* Marker colour — fretboard + side dot combined, deduplicated */}
+            {markerColourIds.length > 0 && (
+              <div>
+                {sectionHead('Fretboard Marker Colours')}
+                <ColourSwatches colours={markerColourIds} colourMetaMap={colourMetaMap} refMap={refMap} />
+              </div>
+            )}
+
           </div>
 
         </div>
@@ -729,12 +752,28 @@ export default async function ModelPage({ params }: { params: Promise<{ slug: st
               {label}
             </p>
           )
-          const dataRow = (label: string, values: (string | null | undefined)[]) => (
+          // Resolve a field from spec_options (bullet list) or fall back to the primary resolved value
+          const fieldOrOptions = (gs: Partial<ModelGenSpec>, key: string, primary: string | null): string | string[] | null =>  {
+            const opts = gs.spec_options?.[key]
+            if (opts && opts.length > 0) return opts.map(rid => r(refMap, rid) ?? rid)
+            return primary
+          }
+
+          const dataRow = (label: string, values: (string | string[] | null | undefined)[]) => (
             <div style={{ display: 'flex', gap: '0', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '13px' }}>
               <span style={{ color: '#5c5a57', width: '180px', flexShrink: 0, fontFamily: 'var(--font-dm-mono)', fontSize: '11px' }}>{label}</span>
-              {values.map((v, i) => (
-                <span key={i} style={{ flex: 1, color: v ? '#f0ede8' : '#2e2d2b', paddingLeft: '16px' }}>{v ?? '—'}</span>
-              ))}
+              {values.map((v, i) => {
+                if (Array.isArray(v)) {
+                  return (
+                    <span key={i} style={{ flex: 1, paddingLeft: '16px' }}>
+                      {v.map((item, j) => (
+                        <span key={j} style={{ display: 'block', color: '#f0ede8', lineHeight: 1.7 }}>• {item}</span>
+                      ))}
+                    </span>
+                  )
+                }
+                return <span key={i} style={{ flex: 1, color: v ? '#f0ede8' : '#2e2d2b', paddingLeft: '16px' }}>{v ?? '—'}</span>
+              })}
             </div>
           )
 
@@ -755,9 +794,16 @@ export default async function ModelPage({ params }: { params: Promise<{ slug: st
               {dataRow('Production years', columns.map(id => genYears(gsFor(id))))}
               {/* TODO: Serial range — derive min/max serial_number_only from registry guitars matching this model_id + generation */}
               {dataRow('Serial range', columns.map(() => null))}
+              {dataRow('Serial number style', columns.map(id => r(refMap, gsFor(id).serial_number_style)))}
+
+              {/* Body */}
+              {groupHeader('Body')}
+              {dataRow('Body binding',          columns.map(id => fieldOrOptions(gsFor(id), 'body_binding', r(refMap, gsFor(id).body_binding))))}
+              {dataRow('Tremolo cover routing', columns.map(id => r(refMap, gsFor(id).tremolo_cover_routing)))}
 
               {/* Pickups & electronics */}
               {groupHeader('Pickups & electronics')}
+              {dataRow('Selector switch type', columns.map(id => r(refMap, gsFor(id).switch_type)))}
               {dataRow('Neck pickup',      columns.map(id => r(refMap, gsFor(id).neck_pickup)))}
               {dataRow('Middle pickup',    columns.map(id => r(refMap, gsFor(id).middle_pickup)))}
               {dataRow('Bridge pickup',    columns.map(id => r(refMap, gsFor(id).bridge_pickup)))}
@@ -768,6 +814,7 @@ export default async function ModelPage({ params }: { params: Promise<{ slug: st
               {groupHeader('Hardware')}
               {dataRow('Hardware colour', columns.map(id => r(refMap, gsFor(id).hardware_colour)))}
               {dataRow('Tuner style',     columns.map(id => r(refMap, gsFor(id).tuner_style)))}
+              {dataRow('Jack socket',     columns.map(id => r(refMap, gsFor(id).jack_socket)))}
               {dataRow('Bridge logo',     columns.map(id => r(refMap, gsFor(id).bridge_logo)))}
               {dataRow('Trem arm',        columns.map(id => r(refMap, gsFor(id).trem_arm)))}
 
@@ -778,9 +825,9 @@ export default async function ModelPage({ params }: { params: Promise<{ slug: st
               {dataRow('Neck construction', columns.map(id => r(refMap, gsFor(id).neck_construction)))}
               {dataRow('Neck finish',       columns.map(id => r(refMap, gsFor(id).neck_finish)))}
               {dataRow('Truss rod cover',   columns.map(id => r(refMap, gsFor(id).truss_rod_cover)))}
-              {dataRow('Neck binding',        columns.map(id => r(refMap, gsFor(id).neck_binding)))}
-              {dataRow('Side-dot markers',   columns.map(id => r(refMap, gsFor(id).side_dot_markers)))}
-              {dataRow('Fretboard markers',  columns.map(id => r(refMap, gsFor(id).fretboard_markers)))}
+              {dataRow('Neck binding',      columns.map(id => r(refMap, gsFor(id).neck_binding)))}
+              {dataRow('Side-dot markers',  columns.map(id => r(refMap, gsFor(id).side_dot_markers)))}
+              {dataRow('Fretboard markers', columns.map(id => fieldOrOptions(gsFor(id), 'fretboard_markers', r(refMap, gsFor(id).fretboard_markers))))}
 
               {/* Headstock */}
               {groupHeader('Headstock')}
