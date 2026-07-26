@@ -136,12 +136,20 @@ export interface ModelGenSpec {
   headstock_binding: string | null     // HDB ref ID
 
   trem_arm: string | null              // TRM ref ID
+  jack_socket: string | null           // JSK ref ID
+  tremolo_cover_routing: string | null // TCR ref ID
+  body_binding: string | null          // BBN ref ID
+  binding_colour: string | null        // BNC ref ID
+  fretboard_marker_colour: string | null // FMC ref ID
+  side_dot_colour: string | null       // FMC ref ID
+  spec_options: Record<string, string[]> | null  // field_name → [ref IDs]; renders as bullet list
 
   left_handed_available: string | null // LHA ref ID
   specification_source: string | null  // SPC ref ID
   notes: string | null
   production_year_start: number | null
   production_year_end: number | null
+  serial_number_style: string | null    // SNS ref ID
   created_at: string | null
   updated_at: string | null
 }

@@ -11,7 +11,7 @@ export type SvgMapRow = {
 
 const svgCache = new Map<string, string>()
 
-function readPickupSvg(filename: string): string {
+export function readPickupSvg(filename: string): string {
   const cached = svgCache.get(filename)
   if (cached !== undefined) return cached
   const filePath = path.join(process.cwd(), 'public', 'pickups', `${filename}.svg`)
