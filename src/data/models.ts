@@ -114,6 +114,32 @@ export const MODEL_CATALOGUE: ModelData[] = [
     ],
     rarity: 'Rare',
   },
+  {
+    model: 'G1',
+    series: 'Evolution',
+    description: 'Maverick\'s take on the Les Paul format. Single-cut body with Evolution roller pots, set-neck construction, and wraparound bridge. Rarer than the F-series models.',
+    specs: [
+      { key: 'Body style', value: 'Single Cut - LP style' },
+      { key: 'Pickup config', value: 'HH' },
+      { key: 'Bridge', value: 'Wraparound' },
+      { key: 'Headstock', value: '3-aside' },
+      { key: 'Frets', value: '22' },
+    ],
+    rarity: 'Low production',
+  },
+  {
+    model: 'G2',
+    series: 'Evolution',
+    description: 'Second variant in the G-Series. Complements the G1 within the single-cut, humbucker-driven side of the Evolution catalogue.',
+    specs: [
+      { key: 'Body style', value: 'Single Cut - LP style' },
+      { key: 'Pickup config', value: 'HH' },
+      { key: 'Bridge', value: 'Wraparound' },
+      { key: 'Headstock', value: '3-aside' },
+      { key: 'Frets', value: '22' },
+    ],
+    rarity: 'Low production',
+  },
   // ── Century ───────────────────────────────────────────────────────────────
   {
     model: 'Chaos 1',
@@ -185,36 +211,10 @@ export const MODEL_CATALOGUE: ModelData[] = [
     ],
     rarity: 'Limited',
   },
-  // ── Unknown ───────────────────────────────────────────────────────────────
-  {
-    model: 'G1',
-    series: 'Unknown',
-    description: 'Maverick\'s take on the Les Paul format. Set-neck construction departs from the bolt-on superstrat approach of the Evolution series. Rarer than the F-series models.',
-    specs: [
-      { key: 'Body style', value: 'Single Cut - LP style' },
-      { key: 'Pickup config', value: 'HH' },
-      { key: 'Bridge', value: 'Wraparound' },
-      { key: 'Headstock', value: '3-aside' },
-      { key: 'Frets', value: '22' },
-    ],
-    rarity: 'Low production',
-  },
-  {
-    model: 'G2',
-    series: 'Unknown',
-    description: 'Second variant in the G-Series. Complements the G1 within the set-neck, humbucker-driven side of the Maverick catalogue.',
-    specs: [
-      { key: 'Body style', value: 'Single Cut - LP style' },
-      { key: 'Pickup config', value: 'HH' },
-      { key: 'Bridge', value: 'Wraparound' },
-      { key: 'Headstock', value: '3-aside' },
-      { key: 'Frets', value: '22' },
-    ],
-    rarity: 'Low production',
-  },
+  // ── Artist Signature ──────────────────────────────────────────────────────
   {
     model: 'JR4',
-    series: 'Unknown',
+    series: 'Artist Signature',
     description: 'A limited production guitar with a direct tie to Jim Root of Stone Sour and Slipknot. Maverick provided Root with several prototypes to test, and he played them live — including at the 2002 Reading Festival. The signature relationship was never formalised and Root moved on, but Maverick went ahead and produced a limited run for the market regardless. Superstrat body with full Maverick contouring, no pickup surrounds, and a hardtail bridge. 24-fret rosewood fingerboard with centralised inlays. Controls are a single through-body pot (likely push-pull volume/tone) and a 5-way blade switch mounted below the bridge.',
     specs: [
       { key: 'Body style', value: 'Superstrat' },
@@ -274,7 +274,7 @@ export const SERIES_ORDER = [
   'Evolution',
   'Century',
   'D-Tox',
-  'Unknown',
+  'Artist Signature',
   // Bass guitars below the divider
   'Nemesis',
 ]
